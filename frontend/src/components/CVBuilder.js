@@ -1,6 +1,4 @@
-// components/CVBuilder.js
 import React, { useState } from 'react';
-import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 
 function CVBuilder() {
   const [step, setStep] = useState(1);
@@ -10,8 +8,6 @@ function CVBuilder() {
     experience: '',
   });
   const [cvModel, setCvModel] = useState('');
-  const stripe = useStripe();
-  const elements = useElements();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -20,46 +16,13 @@ function CVBuilder() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (step === 1) {
       setStep(2);
     } else if (step === 2) {
-      // Handle payment logic here
-      if (!stripe || !elements) {
-        return;
-      }
-
-      const result = await stripe.createPaymentMethod({
-        type: 'card',
-        card: elements.getElement(CardElement),
-        billing_details: {
-          name: formData.name,
-          email: formData.email,
-        },
-      });
-
-      if (result.error) {
-        console.error(result.error.message);
-      } else {
-        // Send payment method id to your server
-        const response = await fetch('/api/charge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            payment_method_id: result.paymentMethod.id,
-            amount: 1000, // $10 in cents
-          }),
-        });
-
-        const paymentResult = await response.json();
-
-        if (paymentResult.success) {
-          setStep(3);
-        } else {
-          console.error(paymentResult.error);
-        }
-      }
+      // Handle non-stripe payment logic or form submission logic here
+      setStep(3);  // Simulating successful payment or submission
     }
   };
 
@@ -118,19 +81,6 @@ function CVBuilder() {
     backgroundColor: '#2b6cb0',
   };
 
-  const cardElementStyle = {
-    base: {
-      fontSize: '16px',
-      color: '#424770',
-      '::placeholder': {
-        color: '#aab7c4',
-      },
-    },
-    invalid: {
-      color: '#9e2146',
-    },
-  };
-
   return (
     <div style={containerStyle}>
       <div style={cardStyle}>
@@ -183,20 +133,13 @@ function CVBuilder() {
           {step === 2 && (
             <form onSubmit={handleSubmit}>
               <p style={{ marginBottom: '1rem' }}>Selected CV Model: {cvModel === 'junior' ? 'Junior' : 'Senior'}</p>
-              <div>
-                <label htmlFor="card-element" style={{ display: 'block', marginBottom: '0.5rem', color: '#4a5568' }}>Credit or debit card</label>
-                <CardElement
-                  id="card-element"
-                  options={cardElementStyle}
-                />
-              </div>
-              <button type="submit" style={buttonStyle}>Pay $10 and Download CV</button>
+              <button type="submit" style={buttonStyle}>Complete and Download CV</button>
             </form>
           )}
           {step === 3 && (
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Thank You!</h3>
-              <p style={{ marginBottom: '1rem' }}>Your payment was successful. Your CV is now ready for download.</p>
+              <p style={{ marginBottom: '1rem' }}>Your CV is now ready for download.</p>
               <a
                 href={`/api/download-cv?model=${cvModel}`}
                 download

@@ -43,16 +43,19 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
           });
           if (!response.ok) throw new Error('Failed to authenticate with server');
           const data = await response.json();
-          setUser(data.user);
-          console.log('Logged in as', data.user);
+          if (data.authenticated) {
+            setUser(data.user);
+            console.log('Logged in as', data.user);
+          } else {
+            throw new Error('Authentication failed');
+          }
         } catch (err) {
           console.error('Authentication error:', err);
           setError('Failed to authenticate. Please try again.');
         }
-      };
-    }
-  };
-
+      }
+    }};
+    
   const checkAdminStatus = async () => {
     // Implement proper admin check here
     setIsAdmin(user && ADMIN_USER_IDS.includes(user.telegramId));

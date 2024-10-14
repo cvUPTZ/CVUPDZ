@@ -28,7 +28,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
       script.id = 'telegram-login-script';
       script.src = 'https://telegram.org/js/telegram-widget.js?22';
       script.async = true;
-      script.setAttribute('data-telegram-login', '@KeepHusteling_Bot'); // Replace with your bot's username
+      script.setAttribute('data-telegram-login', 'KeepHusteling_Bot'); // Replace with your bot's username
       script.setAttribute('data-size', 'large');
       script.setAttribute('data-onauth', 'onTelegramAuth(user)');
       script.setAttribute('data-request-access', 'write');

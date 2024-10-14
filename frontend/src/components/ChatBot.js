@@ -79,15 +79,13 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
       const response = await fetch('https://cvupdz.vercel.app/api/bot/sendMessage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          chatId: user.id, // Assuming you have the user's Telegram ID stored
-          messageText: userInput 
-        }),
+        body: JSON.stringify({ message: userInput }),
       });
-      if (!response.ok) throw new Error('Failed to send message');
-      const data = await response.json();
-      setBotResponses((prev) => [...prev, { user: userInput, bot: data.text }]);
-      setUserInput('');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+      // ... rest of the success logic ...
     } catch (err) {
       console.error('Error details:', err);
       setError(`Failed to send message: ${err.message}`);

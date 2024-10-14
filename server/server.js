@@ -24,7 +24,7 @@ app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
 
 // Middleware to set additional CORS headers
 function setCorsHeaders(req, res, next) {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Update as necessary
+  res.setHeader('Access-Control-Allow-Origin', 'https://cvupdz.vercel.app'); // Update as necessary
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   next();

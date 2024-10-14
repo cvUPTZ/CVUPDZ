@@ -1,308 +1,191 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const TelegramBot = require('node-telegram-bot-api');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const crypto = require('crypto');
-require('dotenv').config();
+import React, { useState, useEffect, useCallback } from 'react';
+import debounce from 'lodash.debounce';
 
-const app = express();
-const cors = require('cors');
+const ChatBot = ({ isOpen, setIsOpen }) => {
+  const [userInput, setUserInput] = useState('');
+  const [botResponses, setBotResponses] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [error, setError] = useState('');
+  const [user, setUser] = useState(null);
 
-// Define CORS options
-const corsOptions = {
-  origin: 'https://cvupdz.vercel.app/', // Replace with your frontend URL
-};
+  useEffect(() => {
+    checkAdminStatus();
+    fetchMessages();
+    loadTelegramScript();
 
-// Use CORS middleware
-app.use(cors(corsOptions));
-
-// Middleware to set additional CORS headers
-function setCorsHeaders(req, res, next) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  next();
-}
-
-// Use the custom CORS headers middleware
-app.use(setCorsHeaders);
-
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.log(err));
-
-// User model
-const User = mongoose.model('User', {
-  name: String,
-  email: String,
-  experience: String,
-  cvModel: String,
-  paymentStatus: { type: String, default: 'pending' },
-  paymentReceipt: String,
-  telegramId: String,
-  telegramUsername: String
-});
-
-// Message model
-const Message = mongoose.model('Message', {
-  user: String,
-  bot: String,
-  timestamp: { type: Date, default: Date.now }
-});
-
-// Question model
-const Question = mongoose.model('Question', {
-  userId: String,
-  question: String,
-  answer: String,
-  answered: { type: Boolean, default: false },
-  timestamp: { type: Date, default: Date.now }
-});
-
-app.use(express.json());
-
-// Multer setup for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/receipts');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}_${file.originalname}`);
-  }
-});
-
-const upload = multer({ storage });
-
-// Telegram Bot Configuration
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const admin_user_ids = [1719899525, 987654321]; // Replace with actual admin user IDs
-
-// Initialize bot
-const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
-
-// Helper function to check if user is admin
-function isAdmin(userId) {
-  return admin_user_ids.includes(userId);
-}
-
-// CV file paths
-const CV_FILES = {
-  'junior': 'cv_models/Junior_cv_model.docx',
-  'senior': 'cv_models/Senior_cv_model.docx'
-};
-
-// Implement bot message processing
-async function processBotMessage(message, chatId, userId) {
-  if (message.startsWith('/start')) {
-    return bot.sendMessage(chatId, '👋 Bonjour ! Utilisez /question pour poser une question, /liste_questions pour voir et répondre aux questions (réservé aux administrateurs), ou /sendcv pour recevoir un CV. 📄');
-  } else if (message.startsWith('/question')) {
-    const questionText = message.slice(10).trim();
-    await new Question({ userId: userId, question: questionText }).save();
-    return bot.sendMessage(chatId, '✅ Votre question a été soumise et sera répondue par un administrateur. 🙏');
-  } else if (message.startsWith('/liste_questions') && isAdmin(userId)) {
-    const unansweredQuestions = await Question.find({ answered: false }).sort('-timestamp').limit(10);
-    const questionList = unansweredQuestions.map(q => `❓ ID: ${q._id}, Question: ${q.question}`).join('\n');
-    return bot.sendMessage(chatId, questionList || '🟢 Aucune question non répondue.');
-  } else if (message.startsWith('/sendcv')) {
-    const args = message.split(',').map(arg => arg.trim());
-    if (args.length !== 2 || !args[0].startsWith('/sendcv')) {
-      return bot.sendMessage(chatId, '❌ Format de commande incorrect. Utilisez :\n/sendcv [email], [junior|senior]\n\nExemple : /sendcv email@gmail.com, junior');
-    }
-    const [_, email, cv_type] = args;
-    const email_regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?$/;
-
-    if (!email_regex.test(email)) {
-      return bot.sendMessage(chatId, '❌ Format d\'email invalide. Veuillez fournir un email valide.');
-    }
-
-    if (!['junior', 'senior'].includes(cv_type.toLowerCase())) {
-      return bot.sendMessage(chatId, '❌ Type de CV incorrect. Veuillez utiliser "junior" ou "senior".');
-    }
-
-    const existingUser = await User.findOne({ email: email });
-    if (existingUser) {
-      return bot.sendMessage(chatId, '📩 Vous êtes limités à un seul type de CV. 🚫');
-    }
-
-    if (!fs.existsSync(CV_FILES[cv_type])) {
-      return bot.sendMessage(chatId, '❌ Le fichier CV n\'existe pas. Veuillez vérifier le type de CV.');
-    }
-
-    const newUser = new User({
-      email: email,
-      cvModel: cv_type,
-      paymentStatus: 'pending'
-    });
-    await newUser.save();
-
-    return bot.sendMessage(chatId, 
-      `✅ Le CV de type ${cv_type.charAt(0).toUpperCase() + cv_type.slice(1)} a été réservé pour ${email}. ✉️\n\n` +
-      'سعداء جدا باهتمامكم بمبادرة CV_UP ! 🌟\n\n' +
-      'لقد تم حفظ طلبكم للحصول على نموذج CV_UP الذي سيساعدكم في تفادي أغلب الأخطاء التي قد تحرمكم من فرص العمل. 📝\n\n' +
-      'للحصول على النسخة النهائية، يرجى إتمام عملية الدفع إما بالتبرع بالدم في إحدى المستشفيات 🩸 أو التبرع بمبلغ من المال إلى جمعية البركة الجزائرية 💵، الذين بدورهم يوصلون التبرعات إلى غزة. 🙏\n\n' +
-      'بعد إتمام عملية الدفع، يرجى إرسال صورة لوصل التبرع إلى هذا البوت للتحقق وإرسال النسخة النهائية من السيرة الذاتية. ✅\n\n' +
-      'حساب جمعية البركة: CCP. 210 243 29 Clé 40 🏥✊'
-    );
-  } else if (message.startsWith('/verify') && isAdmin(userId)) {
-    const args = message.split(' ');
-    if (args.length !== 2) {
-      return bot.sendMessage(chatId, '❌ Format incorrect. Utilisez : /verify [email]');
-    }
-    const email = args[1];
-    const user = await User.findOne({ email: email });
-    if (!user) {
-      return bot.sendMessage(chatId, '❌ Utilisateur non trouvé.');
-    }
-    user.paymentStatus = 'completed';
-    await user.save();
-    return bot.sendMessage(chatId, `✅ Paiement vérifié pour ${email}. Le CV sera envoyé sous peu.`);
-  } else {
-    return bot.sendMessage(chatId, 'Commande non reconnue. Utilisez /start pour voir les options disponibles.');
-  }
-}
-
-// Bot command handlers
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const messageText = msg.text;
-
-  try {
-    await processBotMessage(messageText, chatId, userId);
-  } catch (error) {
-    console.error('Error processing message:', error);
-    bot.sendMessage(chatId, 'Une erreur s\'est produite. Veuillez réessayer plus tard.');
-  }
-});
-
-// Function to verify Telegram login
-function verifyTelegramLogin(authData) {
-  const { hash, ...data } = authData;
-  const secretKey = crypto.createHash('sha256').update(TELEGRAM_BOT_TOKEN).digest();
-  const dataCheckString = Object.keys(data)
-    .sort()
-    .map(key => `${key}=${data[key]}`)
-    .join('\n');
-  
-  const hmac = crypto.createHmac('sha256', secretKey)
-    .update(dataCheckString)
-    .digest('hex');
-  
-  return hmac === hash;
-}
-
-// API routes
-
-// Create a new user
-app.post('/api/user', async (req, res) => {
-  try {
-    const user = new User(req.body);
-    await user.save();
-    res.status(201).json(user);
-  } catch (error) {
-    res.status(500).json({ error: 'Error creating user' });
-  }
-});
-
-// Upload payment receipt
-app.post('/api/upload-receipt', upload.single('receipt'), async (req, res) => {
-  const { email } = req.body;
-  try {
-    const user = await User.findOne({ email: email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    user.paymentReceipt = req.file.path;
-    user.paymentStatus = 'pending_verification';
-    await user.save();
-
-    res.json({ success: true, message: 'Receipt uploaded successfully', receiptPath: req.file.path });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Admin route to verify payment and update status
-app.post('/api/verify-payment', async (req, res) => {
-  const { email, adminId } = req.body;
-  if (!isAdmin(adminId)) {
-    return res.status(403).json({ error: 'Unauthorized access' });
-  }
-
-  try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    user.paymentStatus = 'completed';
-    await user.save();
-    res.json({ success: true, message: 'Payment verified' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Telegram login route
-app.post('/api/telegram-login', async (req, res) => {
-  const authData = req.body;
-  
-  if (!verifyTelegramLogin(authData)) {
-    return res.status(401).json({ error: 'Invalid authentication data' });
-  }
-  
-  try {
-    let user = await User.findOne({ telegramId: authData.id });
-    
-    if (!user) {
-      user = new User({
-        name: `${authData.first_name} ${authData.last_name || ''}`,
-        telegramId: authData.id,
-        telegramUsername: authData.username
-      });
-      await user.save();
-    }
-    
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        name: user.name,
-        telegramId: user.telegramId,
-        telegramUsername: user.telegramUsername
+    return () => {
+      if (window.onTelegramAuth) {
+        delete window.onTelegramAuth;
       }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+    };
+  }, []);
 
-app.post('/api/bot/sendMessage', cors(), async (req, res) => {
-  console.log('Request received:', req.body);
-  const { chatId, messageText, message } = req.body;
-  const textToSend = messageText || message;
-  
-  if (!chatId || !textToSend) {
-    return res.status(400).json({ error: 'Chat ID and message text are required.' });
-  }
+  const loadTelegramScript = () => {
+    if (!document.getElementById('telegram-login-script')) {
+      const script = document.createElement('script');
+      script.id = 'telegram-login-script';
+      script.src = 'https://telegram.org/js/telegram-widget.js?22';
+      script.async = true;
+      script.setAttribute('data-telegram-login', 'YOUR_BOT_USERNAME'); // Replace with your bot's username
+      script.setAttribute('data-size', 'large');
+      script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+      script.setAttribute('data-request-access', 'write');
+      document.getElementById('telegram-login-widget').appendChild(script);
 
-  try {
-    const response = await bot.sendMessage(chatId, textToSend);
-    res.json(response);
-  } catch (error) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ error: 'Failed to send message' });
-  }
-});
+      window.onTelegramAuth = async (user) => {
+        try {
+          const response = await fetch('https://cvupdz.vercel.app/api/telegram-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(user),
+          });
+          if (!response.ok) throw new Error('Failed to authenticate with server');
+          const data = await response.json();
+          setUser(data.user);
+          console.log('Logged in as', data.user);
+        } catch (err) {
+          console.error('Authentication error:', err);
+          setError('Failed to authenticate. Please try again.');
+        }
+      };
+    }
+  };
 
-// Server listener
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+  const checkAdminStatus = async () => {
+    // Implement proper admin check here
+    setIsAdmin(user && admin_user_ids.includes(user.telegramId));
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const response = await fetch('https://cvupdz.vercel.app/api/bot/messages');
+      if (!response.ok) throw new Error('Failed to fetch messages');
+      const data = await response.json();
+      setBotResponses(data);
+    } catch (err) {
+      setError('Failed to fetch messages. Please try again later.');
+    }
+  };
+
+  const handleInputChange = useCallback(
+    debounce((value) => {
+      setUserInput(value);
+      setError('');
+    }, 300),
+    []
+  );
+
+  const onChangeInput = (e) => {
+    handleInputChange(e.target.value);
+  };
+
+  const handleSendMessage = async () => {
+    if (!userInput.trim()) {
+      setError('Message cannot be empty.');
+      return;
+    }
+    try {
+      const response = await fetch('https://cvupdz.vercel.app/api/bot/sendMessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          chatId: user.telegramId, 
+          messageText: userInput 
+        }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+      setUserInput('');
+      fetchMessages();
+    } catch (err) {
+      console.error('Error details:', err);
+      setError(`Failed to send message: ${err.message}`);
+    }
+  };
+
+  const handleAdminAction = async (action) => {
+    try {
+      const response = await fetch(`https://cvupdz.vercel.app/api/bot/${action}`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user.telegramId }),
+      });
+      if (!response.ok) throw new Error(`Failed to perform ${action}`);
+      const data = await response.json();
+      alert(data.message);
+    } catch (err) {
+      alert(`Failed to perform ${action}`);
+    }
+  };
+
+  const MessageList = React.memo(({ botResponses }) => {
+    return (
+      <div className="h-[calc(100%-130px)] overflow-y-auto p-4">
+        {botResponses.map((item, index) => (
+          <div key={index} className="mb-2">
+            <div className="font-bold">User: {item.user}</div>
+            <div>Bot: {item.bot}</div>
+          </div>
+        ))}
+      </div>
+    );
+  });
+
+  return (
+    <div
+      className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl transition-transform duration-300 ease-in-out ${
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}
+    >
+      <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+        <h3 className="font-semibold">Chat with us</h3>
+        <button onClick={() => setIsOpen(false)} className="text-white hover:text-gray-200">
+          &times;
+        </button>
+      </div>
+      {!user ? (
+        <div className="p-4 text-center">
+          <h4 className="mb-4">Please log in with Telegram to continue</h4>
+          <div id="telegram-login-widget"></div>
+        </div>
+      ) : (
+        <>
+          <MessageList botResponses={botResponses} />
+          {error && <p className="text-red-600 text-center">{error}</p>}
+          <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="p-4 border-t">
+            <div className="flex">
+              <input
+                type="text"
+                value={userInput}
+                onChange={onChangeInput}
+                className="flex-grow px-4 py-2 rounded-l-md border focus:outline-none focus:ring-2 focus:ring-blue-600"
+                placeholder="Type your message..."
+                required
+              />
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700"
+              >
+                Send
+              </button>
+            </div>
+          </form>
+          {isAdmin && (
+            <div className="p-4 border-t">
+              <button onClick={() => handleAdminAction('scrapeLinkedIn')} className="mr-2 px-4 py-2 bg-green-600 text-white rounded-md">
+                Scrape LinkedIn
+              </button>
+              <button onClick={() => handleAdminAction('offremploi')} className="px-4 py-2 bg-green-600 text-white rounded-md">
+                Get Job Offers
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+export default ChatBot;

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "concurrently \"cd server && npm run start\" \"cd frontend && npm start\"",
-    "build": "cd frontend && npm install && npm run build",
+    "build": "cd frontend && npm install && npm run build --verbose",
     "install-all": "npm install && cd frontend && npm install && cd ../server && npm install"
   },
   "devDependencies": {

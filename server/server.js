@@ -10,7 +10,24 @@ require('dotenv').config();
 
 const app = express();
 const cors = require('cors');
-app.use(cors());
+// Define CORS options
+const corsOptions = {
+  origin: 'https://cvupdz.vercel.app/', // Replace with your frontend URL
+};
+
+// Use CORS middleware
+app.use(cors(corsOptions));
+
+// Middleware to set additional CORS headers
+function setCorsHeaders(req, res, next) {
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Update as necessary
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  next();
+}
+
+// Use the custom CORS headers middleware
+app.use(setCorsHeaders);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)

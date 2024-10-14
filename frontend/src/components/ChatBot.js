@@ -48,7 +48,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
 
   const fetchMessages = async () => {
     try {
-      const response = await fetch('/api/bot/messages');
+      const response = await fetch('https://cvupdz.vercel.app/api/bot/messages');
       if (!response.ok) throw new Error('Failed to fetch messages');
       const data = await response.json();
       setBotResponses(data);
@@ -68,7 +68,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
       return;
     }
     try {
-      const response = await fetch('/api/bot/sendMessage', {
+      const response = await fetch('https://cvupdz.vercel.app/api/bot/sendMessage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userInput }),

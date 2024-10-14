@@ -85,8 +85,8 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 function isAdmin(userId) {
   return admin_user_ids.includes(userId);
 }
-
 app.post('/api/bot/sendMessage', cors(), async (req, res) => {
+  console.log('Request received:', req.body); // Log the incoming request body
   const { chatId, messageText, message } = req.body;
   const textToSend = messageText || message;
   

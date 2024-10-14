@@ -31,7 +31,7 @@ app.use(setCorsHeaders);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB connectedg'))
+  .then(() => console.log('MongoDB connected'))
   .catch(err => console.log(err));
 
 // User model
@@ -85,8 +85,61 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 function isAdmin(userId) {
   return admin_user_ids.includes(userId);
 }
+
+// Telegram login route
+app.post('/api/telegram-login', async (req, res) => {
+  const authData = req.body;
+  
+  if (!verifyTelegramLogin(authData)) {
+    return res.status(401).json({ error: 'Invalid authentication data' });
+  }
+  
+  try {
+    let user = await User.findOne({ telegramId: authData.id });
+    
+    if (!user) {
+      user = new User({
+        name: `${authData.first_name} ${authData.last_name || ''}`,
+        telegramId: authData.id,
+        telegramUsername: authData.username
+      });
+      await user.save();
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        telegramId: user.telegramId,
+        telegramUsername: user.telegramUsername
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+// Function to verify Telegram login
+function verifyTelegramLogin(authData) {
+  const { hash, ...data } = authData;
+  const secretKey = crypto.createHash('sha256').update(TELEGRAM_BOT_TOKEN).digest();
+  const dataCheckString = Object.keys(data)
+    .sort()
+    .map(key => `${key}=${data[key]}`)
+    .join('\n');
+  
+  const hmac = crypto.createHmac('sha256', secretKey)
+    .update(dataCheckString)
+    .digest('hex');
+  
+  return hmac === hash;
+}
+
+
+
 app.post('/api/bot/sendMessage', cors(), async (req, res) => {
-  console.log('Request received:', req.body); // Log the incoming request body
   const { chatId, messageText, message } = req.body;
   const textToSend = messageText || message;
   

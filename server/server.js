@@ -1,4 +1,3 @@
-//server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const multer = require('multer');
@@ -69,7 +68,8 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 function isAdmin(userId) {
   return admin_user_ids.includes(userId);
 }
-app.post('/api/bot/sendMessage', async (req, res) => {
+
+app.post('/api/bot/sendMessage', cors(), async (req, res) => {
   const { chatId, messageText, message } = req.body;
   const textToSend = messageText || message;
   
@@ -85,6 +85,7 @@ app.post('/api/bot/sendMessage', async (req, res) => {
     res.status(500).json({ error: 'Failed to send message' });
   }
 });
+
 // CV file paths
 const CV_FILES = {
   'junior': 'cv_models/Junior_cv_model.docx',

@@ -1,3 +1,4 @@
+//server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const multer = require('multer');
@@ -68,23 +69,22 @@ const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 function isAdmin(userId) {
   return admin_user_ids.includes(userId);
 }
-
-// Route to handle sending messages via bot
 app.post('/api/bot/sendMessage', async (req, res) => {
-  const { chatId, messageText } = req.body;
-  if (!chatId || !messageText) {
+  const { chatId, messageText, message } = req.body;
+  const textToSend = messageText || message;
+  
+  if (!chatId || !textToSend) {
     return res.status(400).json({ error: 'Chat ID and message text are required.' });
   }
 
   try {
-    const response = await bot.sendMessage(chatId, messageText);
+    const response = await bot.sendMessage(chatId, textToSend);
     res.json(response);
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ error: 'Failed to send message' });
   }
 });
-
 // CV file paths
 const CV_FILES = {
   'junior': 'cv_models/Junior_cv_model.docx',

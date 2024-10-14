@@ -1,3 +1,4 @@
+//Chatbot.js
 import React, { useState, useEffect, useCallback } from 'react';
 import debounce from 'lodash.debounce';
 
@@ -78,14 +79,18 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
       const response = await fetch('https://cvupdz.vercel.app/api/bot/sendMessage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userInput }),
+        body: JSON.stringify({ 
+          chatId: user.id, // Assuming you have the user's Telegram ID stored
+          messageText: userInput 
+        }),
       });
       if (!response.ok) throw new Error('Failed to send message');
       const data = await response.json();
-      setBotResponses((prev) => [...prev, { user: userInput, bot: data.response }]);
+      setBotResponses((prev) => [...prev, { user: userInput, bot: data.text }]);
       setUserInput('');
     } catch (err) {
-      setError('Failed to send message. Please try again later.');
+      console.error('Error details:', err);
+      setError(`Failed to send message: ${err.message}`);
     }
   };
 

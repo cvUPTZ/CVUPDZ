@@ -1,52 +1,158 @@
-// components/ChatBot.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function ChatBot({ isOpen, setIsOpen }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+const ChatBot = ({ isOpen, setIsOpen }) => {
+  const [userInput, setUserInput] = useState('');
+  const [botResponses, setBotResponses] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [error, setError] = useState('');
+  const [user, setUser] = useState(null);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (input.trim() === '') return;
-    
-    setMessages([...messages, { text: input, sender: 'user' }]);
-    setInput('');
-    
-    // Simulate bot response
-    setTimeout(() => {
-      setMessages(prev => [...prev, { text: "Thank you for your message. How can I assist you today?", sender: 'bot' }]);
-    }, 1000);
+  useEffect(() => {
+    checkAdminStatus();
+    fetchMessages();
+    loadTelegramScript();
+
+    // Cleanup to avoid memory leaks
+    return () => {
+      if (window.onTelegramAuth) {
+        delete window.onTelegramAuth;
+      }
+    };
+  }, []);
+
+  const loadTelegramScript = () => {
+    // Prevent adding the script multiple times
+    if (!document.getElementById('telegram-login-script')) {
+      const script = document.createElement('script');
+      script.id = 'telegram-login-script';
+      script.src = 'https://telegram.org/js/telegram-widget.js?22';
+      script.async = true;
+      script.setAttribute('data-telegram-login', 'KeepHusteling_Bot'); // Replace with your bot's username
+      script.setAttribute('data-size', 'large');
+      script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+      script.setAttribute('data-request-access', 'write');
+      document.getElementById('telegram-login-widget').appendChild(script);
+
+      window.onTelegramAuth = (user) => {
+        setUser(user);
+        console.log('Logged in as ', user);
+        // Additional user authentication logic here
+      };
+    }
+  };
+
+  const checkAdminStatus = async () => {
+    // Mocked admin check; replace with real API call if needed
+    setIsAdmin(true); // Set to true for testing purposes
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const response = await fetch('/api/bot/messages');
+      if (!response.ok) throw new Error('Failed to fetch messages');
+      const data = await response.json();
+      setBotResponses(data);
+    } catch (err) {
+      setError('Failed to fetch messages. Please try again later.');
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setUserInput(e.target.value);
+    setError(''); // Clear any previous error when user starts typing
+  };
+
+  const handleSendMessage = async () => {
+    if (!userInput.trim()) {
+      setError('Message cannot be empty.');
+      return;
+    }
+    try {
+      const response = await fetch('/api/bot/sendMessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userInput }),
+      });
+      if (!response.ok) throw new Error('Failed to send message');
+      const data = await response.json();
+      setBotResponses((prev) => [...prev, { user: userInput, bot: data.response }]);
+      setUserInput('');
+    } catch (err) {
+      setError('Failed to send message. Please try again later.');
+    }
+  };
+
+  const handleAdminAction = async (action) => {
+    try {
+      const response = await fetch(`/api/bot/${action}`, { method: 'POST' });
+      if (!response.ok) throw new Error(`Failed to perform ${action}`);
+      const data = await response.json();
+      alert(data.message);
+    } catch (err) {
+      alert(`Failed to perform ${action}`);
+    }
   };
 
   return (
-    <div className={`fixed bottom-4 right-4 w-80 bg-white rounded-lg shadow-xl transition-all duration-300 ${isOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
-      <div className="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">
+    <div
+      className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl transition-transform duration-300 ease-in-out ${
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}
+    >
+      <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
         <h3 className="font-semibold">Chat with us</h3>
-        <button onClick={() => setIsOpen(false)} className="text-white hover:text-gray-200">&times;</button>
+        <button onClick={() => setIsOpen(false)} className="text-white hover:text-gray-200">
+          &times;
+        </button>
       </div>
-      <div className="h-80 overflow-y-auto p-4">
-        {messages.map((msg, index) => (
-          <div key={index} className={`mb-2 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
-            <span className={`inline-block p-2 rounded-lg ${msg.sender === 'user' ? 'bg-blue-100' : 'bg-gray-200'}`}>
-              {msg.text}
-            </span>
-          </div>
-        ))}
-      </div>
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="flex-grow px-4 py-2 rounded-l-md border focus:outline-none focus:ring-2 focus:ring-blue-600"
-            placeholder="Type your message..."
-          />
-          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700">Send</button>
+      {!user ? (
+        <div className="p-4 text-center">
+          <h4 className="mb-4">Please log in with Telegram to continue</h4>
+          <div id="telegram-login-widget"></div>
         </div>
-      </form>
+      ) : (
+        <>
+          <div className="h-[calc(100%-130px)] overflow-y-auto p-4">
+            {botResponses.map((item, index) => (
+              <div key={index} className="mb-2">
+                <div className="font-bold">User: {item.user}</div>
+                <div>Bot: {item.bot}</div>
+              </div>
+            ))}
+          </div>
+          {error && <p className="text-red-600 text-center">{error}</p>}
+          <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="p-4 border-t">
+            <div className="flex">
+              <input
+                type="text"
+                value={userInput}
+                onChange={handleInputChange}
+                className="flex-grow px-4 py-2 rounded-l-md border focus:outline-none focus:ring-2 focus:ring-blue-600"
+                placeholder="Type your message..."
+                required
+              />
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700"
+              >
+                Send
+              </button>
+            </div>
+          </form>
+          {isAdmin && (
+            <div className="p-4 border-t">
+              <button onClick={() => handleAdminAction('scrapeLinkedIn')} className="mr-2 px-4 py-2 bg-green-600 text-white rounded-md">
+                Scrape LinkedIn
+              </button>
+              <button onClick={() => handleAdminAction('offremploi')} className="px-4 py-2 bg-green-600 text-white rounded-md">
+                Get Job Offers
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
-}
+};
 
 export default ChatBot;

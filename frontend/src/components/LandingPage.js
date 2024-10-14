@@ -51,7 +51,7 @@ const LandingPage = () => {
 
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['hero', 'services', 'jobSearch', 'successStories', 'blog', 'contact'];
+      const sections = ['hero', 'services', 'jobSearch', 'successStories', 'blog', 'contact', 'chatbot'];
       const currentSection = sections.find(section => {
         const element = document.getElementById(section);
         if (element) {
@@ -81,6 +81,7 @@ const LandingPage = () => {
             { id: 'jobSearch', icon: BookOpen },
             { id: 'successStories', icon: Users },
             { id: 'blog', icon: MessageCircle },
+            { id: 'chatbot', icon: MessageCircle }, // Add ChatBot section
           ].map(({ id, icon: Icon }) => (
             <li key={id}>
               <a href={`#${id}`}>
@@ -106,8 +107,12 @@ const LandingPage = () => {
         <section id="contact"><Contact /></section>
       </main>
 
+      {/* ChatBot Section */}
+      <div id="chatbot" className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl transition-transform duration-300 ease-in-out ${isChatbotOpen ? 'translate-x-0' : 'translate-x-full'} z-50`}>
+        <ChatBot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} />
+      </div>
+
       <Footer />
-      <ChatBot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} />
       <FloatingActionButton icon={MessageCircle} onClick={() => setIsChatbotOpen(!isChatbotOpen)} />
     </div>
   );

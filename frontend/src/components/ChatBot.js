@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import debounce from 'lodash.debounce';
 
+const ADMIN_USER_IDS = [1719899525, 987654321]; // Replace with actual admin Telegram IDs
+
 const ChatBot = ({ isOpen, setIsOpen }) => {
   const [userInput, setUserInput] = useState('');
   const [botResponses, setBotResponses] = useState([]);
@@ -26,7 +28,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
       script.id = 'telegram-login-script';
       script.src = 'https://telegram.org/js/telegram-widget.js?22';
       script.async = true;
-      script.setAttribute('data-telegram-login', 'YOUR_BOT_USERNAME'); // Replace with your bot's username
+      script.setAttribute('data-telegram-login', '@KeepHusteling_Bot'); // Replace with your bot's username
       script.setAttribute('data-size', 'large');
       script.setAttribute('data-onauth', 'onTelegramAuth(user)');
       script.setAttribute('data-request-access', 'write');
@@ -53,7 +55,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
 
   const checkAdminStatus = async () => {
     // Implement proper admin check here
-    setIsAdmin(user && admin_user_ids.includes(user.telegramId));
+    setIsAdmin(user && ADMIN_USER_IDS.includes(user.telegramId));
   };
 
   const fetchMessages = async () => {

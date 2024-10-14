@@ -9,12 +9,15 @@ const cheerio = require('cheerio');
 require('dotenv').config();
 
 const app = express();
+const cors = require('cors');
+app.use(cors());
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.log(err));
 
+// User model
 const User = mongoose.model('User', {
   name: String,
   email: String,
@@ -24,12 +27,14 @@ const User = mongoose.model('User', {
   paymentReceipt: String
 });
 
+// Message model
 const Message = mongoose.model('Message', {
   user: String,
   bot: String,
   timestamp: { type: Date, default: Date.now }
 });
 
+// Question model
 const Question = mongoose.model('Question', {
   userId: String,
   question: String,
@@ -59,10 +64,26 @@ const admin_user_ids = [1719899525, 987654321]; // Replace with actual admin use
 // Initialize bot
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 
-// Helper functions
+// Helper function to check if user is admin
 function isAdmin(userId) {
   return admin_user_ids.includes(userId);
 }
+
+// Route to handle sending messages via bot
+app.post('/api/bot/sendMessage', async (req, res) => {
+  const { chatId, messageText } = req.body;
+  if (!chatId || !messageText) {
+    return res.status(400).json({ error: 'Chat ID and message text are required.' });
+  }
+
+  try {
+    const response = await bot.sendMessage(chatId, messageText);
+    res.json(response);
+  } catch (error) {
+    console.error('Error sending message:', error);
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
 
 // CV file paths
 const CV_FILES = {
@@ -70,12 +91,12 @@ const CV_FILES = {
   'senior': 'cv_models/Senior_cv_model.docx'
 };
 
-// Implement actual bot logic
+// Implement bot message processing
 async function processBotMessage(message, chatId, userId) {
   if (message.startsWith('/start')) {
     return bot.sendMessage(chatId, '👋 Bonjour ! Utilisez /question pour poser une question, /liste_questions pour voir et répondre aux questions (réservé aux administrateurs), ou /sendcv pour recevoir un CV. 📄');
   } else if (message.startsWith('/question')) {
-    const questionText = message.slice(10);
+    const questionText = message.slice(10).trim();
     await new Question({ userId: userId, question: questionText }).save();
     return bot.sendMessage(chatId, '✅ Votre question a été soumise et sera répondue par un administrateur. 🙏');
   } else if (message.startsWith('/liste_questions') && isAdmin(userId)) {
@@ -84,7 +105,7 @@ async function processBotMessage(message, chatId, userId) {
     return bot.sendMessage(chatId, questionList || '🟢 Aucune question non répondue.');
   } else if (message.startsWith('/sendcv')) {
     const args = message.split(',').map(arg => arg.trim());
-    if (args.length !== 3 || !args[0].startsWith('/sendcv')) {
+    if (args.length !== 2 || !args[0].startsWith('/sendcv')) {
       return bot.sendMessage(chatId, '❌ Format de commande incorrect. Utilisez :\n/sendcv [email], [junior|senior]\n\nExemple : /sendcv email@gmail.com, junior');
     }
     const [_, email, cv_type] = args;
@@ -147,9 +168,7 @@ bot.on('message', async (msg) => {
   const messageText = msg.text;
 
   try {
-    const response = await processBotMessage(messageText, chatId, userId);
-    // Save message and response to database
-    await new Message({ user: messageText, bot: response.text }).save();
+    await processBotMessage(messageText, chatId, userId);
   } catch (error) {
     console.error('Error processing message:', error);
     bot.sendMessage(chatId, 'Une erreur s\'est produite. Veuillez réessayer plus tard.');
@@ -192,107 +211,25 @@ app.post('/api/upload-receipt', upload.single('receipt'), async (req, res) => {
 app.post('/api/verify-payment', async (req, res) => {
   const { email, adminId } = req.body;
   if (!isAdmin(adminId)) {
-    return res.status(403).json({ error: 'Unauthorized' });
+    return res.status(403).json({ error: 'Unauthorized access' });
   }
+
   try {
-    const user = await User.findOne({ email: email });
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     user.paymentStatus = 'completed';
     await user.save();
-
-    res.json({ success: true, message: 'Payment verified and status updated' });
+    res.json({ success: true, message: 'Payment verified' });
   } catch (error) {
-    res.status(500).json({ error: 'Error verifying payment' });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Download CV
-app.get('/api/download/:email', async (req, res) => {
-  try {
-    const user = await User.findOne({ email: req.params.email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (user.paymentStatus === 'completed') {
-      const cvFilePath = path.join(__dirname, CV_FILES[user.cvModel]);
-      
-      if (fs.existsSync(cvFilePath)) {
-        res.download(cvFilePath, `${user.email}_CV.docx`);
-      } else {
-        res.status(404).json({ error: 'CV template not found' });
-      }
-    } else {
-      res.status(403).json({ error: 'Payment required' });
-    }
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching user data' });
-  }
-});
-
-// Get all messages
-app.get('/api/bot/messages', async (req, res) => {
-  try {
-    const messages = await Message.find().sort('-timestamp').limit(100);
-    res.json(messages);
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching messages' });
-  }
-});
-
-// Admin route for LinkedIn scraping
-app.post('/api/bot/scrapeLinkedIn', async (req, res) => {
-  const { adminId } = req.body;
-  if (!isAdmin(adminId)) {
-    return res.status(403).json({ error: 'Unauthorized' });
-  }
-  try {
-    // Implement LinkedIn scraping logic here
-    // This is a placeholder and should be replaced with actual scraping code
-    const scrapedData = { jobs: [], companies: [] };
-    res.json({ message: 'LinkedIn scraping completed', data: scrapedData });
-  } catch (error) {
-    res.status(500).json({ error: 'Error during LinkedIn scraping' });
-  }
-});
-
-// Admin route to get job offers
-app.post('/api/bot/offremploi', async (req, res) => {
-  const { adminId } = req.body;
-  if (!isAdmin(adminId)) {
-    return res.status(403).json({ error: 'Unauthorized' });
-  }
-  try {
-    // Implement job offer retrieval logic here
-    // This is a placeholder and should be replaced with actual job retrieval code
-    const jobs = [
-      { title: 'Software Engineer', company: 'TechCorp', location: 'Algiers' },
-      { title: 'Data Analyst', company: 'DataCo', location: 'Oran' }
-    ];
-    res.json({ message: 'Job offers retrieved', offers: jobs });
-  } catch (error) {
-    res.status(500).json({ error: 'Error retrieving job offers' });
-  }
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Something broke!');
-});
-
-// Start server
+// Server listener
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
-
-// Start the bot
-bot.on('polling_error', (error) => {
-  console.log(error);
-});
-
-console.log('Bot is running...');

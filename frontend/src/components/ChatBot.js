@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import debounce from 'lodash.debounce';
 
 const ChatBot = ({ isOpen, setIsOpen }) => {
   const [userInput, setUserInput] = useState('');
@@ -36,7 +37,6 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
       window.onTelegramAuth = (user) => {
         setUser(user);
         console.log('Logged in as ', user);
-        // Additional user authentication logic here
       };
     }
   };
@@ -57,9 +57,16 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
     }
   };
 
-  const handleInputChange = (e) => {
-    setUserInput(e.target.value);
-    setError(''); // Clear any previous error when user starts typing
+  const handleInputChange = useCallback(
+    debounce((value) => {
+      setUserInput(value);
+      setError('');
+    }, 300), // Debounce delay (in milliseconds)
+    []
+  );
+
+  const onChangeInput = (e) => {
+    handleInputChange(e.target.value);
   };
 
   const handleSendMessage = async () => {
@@ -93,6 +100,19 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
     }
   };
 
+  const MessageList = React.memo(({ botResponses }) => {
+    return (
+      <div className="h-[calc(100%-130px)] overflow-y-auto p-4">
+        {botResponses.map((item, index) => (
+          <div key={index} className="mb-2">
+            <div className="font-bold">User: {item.user}</div>
+            <div>Bot: {item.bot}</div>
+          </div>
+        ))}
+      </div>
+    );
+  });
+
   return (
     <div
       className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl transition-transform duration-300 ease-in-out ${
@@ -112,21 +132,14 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
         </div>
       ) : (
         <>
-          <div className="h-[calc(100%-130px)] overflow-y-auto p-4">
-            {botResponses.map((item, index) => (
-              <div key={index} className="mb-2">
-                <div className="font-bold">User: {item.user}</div>
-                <div>Bot: {item.bot}</div>
-              </div>
-            ))}
-          </div>
+          <MessageList botResponses={botResponses} />
           {error && <p className="text-red-600 text-center">{error}</p>}
           <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="p-4 border-t">
             <div className="flex">
               <input
                 type="text"
                 value={userInput}
-                onChange={handleInputChange}
+                onChange={onChangeInput}
                 className="flex-grow px-4 py-2 rounded-l-md border focus:outline-none focus:ring-2 focus:ring-blue-600"
                 placeholder="Type your message..."
                 required

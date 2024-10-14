@@ -27,6 +27,7 @@
     {
       "source": "/(.*)",
       "destination": "/"
+
     }
   ]
 }

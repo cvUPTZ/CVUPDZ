@@ -114,7 +114,7 @@ app.get('/api/download/:userId', async (req, res) => {
 });
 
 // Download CV
-app.get('/', async (req, res) => {
+app.get('/9',  (req, res) => {
   res.json("Hello");
 });
 

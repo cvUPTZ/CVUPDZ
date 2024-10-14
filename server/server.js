@@ -113,6 +113,11 @@ app.get('/api/download/:userId', async (req, res) => {
   }
 });
 
+// Download CV
+app.get('/', async (req, res) => {
+  res.json("Hello");
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

@@ -1,4 +1,7 @@
-// React Component
+//Chatbot.js
+import React, { useState, useEffect, useCallback } from 'react';
+import debounce from 'lodash.debounce';
+
 const ChatBot = ({ isOpen, setIsOpen }) => {
   const [userInput, setUserInput] = useState('');
   const [botResponses, setBotResponses] = useState([]);
@@ -11,6 +14,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
     fetchMessages();
     loadTelegramScript();
 
+    // Cleanup to avoid memory leaks
     return () => {
       if (window.onTelegramAuth) {
         delete window.onTelegramAuth;
@@ -19,12 +23,13 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
   }, []);
 
   const loadTelegramScript = () => {
+    // Prevent adding the script multiple times
     if (!document.getElementById('telegram-login-script')) {
       const script = document.createElement('script');
       script.id = 'telegram-login-script';
       script.src = 'https://telegram.org/js/telegram-widget.js?22';
       script.async = true;
-      script.setAttribute('data-telegram-login', 'KeepHusteling_Bot');
+      script.setAttribute('data-telegram-login', 'KeepHusteling_Bot'); // Replace with your bot's username
       script.setAttribute('data-size', 'large');
       script.setAttribute('data-onauth', 'onTelegramAuth(user)');
       script.setAttribute('data-request-access', 'write');
@@ -38,6 +43,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
   };
 
   const checkAdminStatus = async () => {
+    // Mocked admin check; replace with real API call if needed
     setIsAdmin(true); // Set to true for testing purposes
   };
 
@@ -56,7 +62,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
     debounce((value) => {
       setUserInput(value);
       setError('');
-    }, 300),
+    }, 300), // Debounce delay (in milliseconds)
     []
   );
 
@@ -79,7 +85,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
         const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
-      // Handle successful message send
+      // ... rest of the success logic ...
     } catch (err) {
       console.error('Error details:', err);
       setError(`Failed to send message: ${err.message}`);
@@ -116,7 +122,7 @@ const ChatBot = ({ isOpen, setIsOpen }) => {
         isOpen ? 'translate-x-0' : 'translate-x-full'
       }`}
     >
-        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+      <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
         <h3 className="font-semibold">Chat with us</h3>
         <button onClick={() => setIsOpen(false)} className="text-white hover:text-gray-200">
           &times;

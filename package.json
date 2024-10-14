@@ -1,15 +1,12 @@
 {
-  "name": "cvupdz",
+  "name": "my-full-stack-app",
   "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "start": "concurrently \"cd server && npm run start\" \"cd frontend && npm start\"",
-    "build": "cd frontend && npm install && npm run build --verbose",
-    "install-all": "npm install && cd frontend && npm install && cd ../server && npm install"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "devDependencies": {
-    "concurrently": "^6.2.0"
-  },
-  "engines": {
-    "node": "18.x"
-  }
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

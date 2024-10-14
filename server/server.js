@@ -8,15 +8,19 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 require('dotenv').config();
 
+
+
+
 const app = express();
-const cors = require('cors');
+
 // Define CORS options
 const corsOptions = {
   origin: 'https://cvupdz.vercel.app/', // Replace with your frontend URL
 };
 
-// Use CORS middleware
-app.use(cors(corsOptions));
+// Enable CORS with the specified options
+app.use(cors(corsOptions)); // Use CORS for all routes
+app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
 
 // Middleware to set additional CORS headers
 function setCorsHeaders(req, res, next) {
